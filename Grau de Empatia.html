@@ -1,0 +1,588 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ImpulsoCoaching - Autodiagnóstico: Grau de Empatia</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+    @keyframes selectPulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+      100% { transform: scale(1); }
+    }
+    .slide-in {
+      animation: slideIn 0.6s ease-out;
+    }
+    .pulse {
+      animation: pulse 2s infinite;
+    }
+    .question-card:nth-child(odd) {
+      background: linear-gradient(135deg, #e0e7ff, #c7d2fe);
+    }
+    .question-card:nth-child(even) {
+      background: linear-gradient(135deg, #fef3c7, #fde68a);
+    }
+    .progress-bar {
+      background: linear-gradient(to right, #4f46e5, #ec4899);
+    }
+    .radio-label input:checked + span {
+      background-color: #4f46e5;
+      color: white;
+      animation: selectPulse 0.3s ease;
+    }
+    .radio-label input:checked {
+      accent-color: #4f46e5;
+    }
+    .radio-label span {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      transition: all 0.2s ease;
+    }
+    .radio-label:hover span {
+      background-color: #e0e7ff;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #4f46e5;
+      color: white;
+    }
+  </style>
+</head>
+<body class="bg-blue-950 min-h-screen flex items-center justify-center p-4">
+  <div class="bg-white rounded-3xl shadow-xl max-w-4xl w-full p-10 slide-in">
+    <div class="text-center mb-8">
+      <h1 class="text-4xl font-bold text-indigo-700 flex items-center justify-center gap-2">
+        <i class="fas fa-heart-pulse text-pink-500"></i>
+        ImpulsoCoaching - Autodiagnóstico: Grau de Empatia
+      </h1>
+      <p class="text-gray-600 mt-2">Descubra seu nível de empatia respondendo às 10 questões abaixo. Os resultados serão exibidos e salvos em um PDF de uma página A4 com o resultado e gráfico!</p>
+    </div>
+
+    <form id="empathyForm" class="space-y-8">
+      <!-- Dados Pessoais -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label for="name" class="block text-sm font-medium text-gray-700 flex items-center gap-1">
+            <i class="fas fa-user"></i> Nome*
+          </label>
+          <input type="text" id="name" name="name" required class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3">
+        </div>
+        <div>
+          <label for="profession" class="block text-sm font-medium text-gray-700 flex items-center gap-1">
+            <i class="fas fa-briefcase"></i> Profissão*
+          </label>
+          <input type="text" id="profession" name="profession" required class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3">
+        </div>
+        <div>
+          <label for="email" class="block text-sm font-medium text-gray-700 flex items-center gap-1">
+            <i class="fas fa-envelope"></i> E-mail*
+          </label>
+          <input type="email" id="email" name="email" required class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3">
+        </div>
+      </div>
+
+      <!-- Barra de Progresso -->
+      <div class="w-full bg-gray-200 rounded-full h-2.5 mb-6">
+        <div id="progressBar" class="progress-bar h-2.5 rounded-full" style="width: 0%"></div>
+      </div>
+
+      <!-- Perguntas -->
+      <div class="space-y-6">
+        <h2 class="text-2xl font-semibold text-gray-800 flex items-center gap-2">
+          <i class="fas fa-question-circle text-indigo-600"></i> Questões
+        </h2>
+        <div id="questions" class="space-y-4">
+          <div class="question-card p-6 rounded-xl shadow-md">
+            <p class="font-medium text-gray-800">1. Sou uma pessoa que persiste quando está frente a um novo desafio, não desistindo nas primeiras dificuldades...</p>
+            <div class="flex flex-wrap gap-4 mt-3">
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q1" value="1" required><span>Jamais</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q1" value="2"><span>Raramente</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q1" value="3"><span>Às vezes</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q1" value="4"><span>Quase Sempre</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q1" value="5"><span>Sempre</span></label>
+            </div>
+          </div>
+          <div class="question-card p-6 rounded-xl shadow-md">
+            <p class="font-medium text-gray-800">2. Sou uma pessoa que procura me colocar no lugar do outro, sendo compreensivo(a) em relação aos momentos difíceis de outra pessoa...</p>
+            <div class="flex flex-wrap gap-4 mt-3">
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q2" value="1" required><span>Jamais</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q2" value="2"><span>Raramente</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q2" value="3"><span>Às vezes</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q2" value="4"><span>Quase Sempre</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q2" value="5"><span>Sempre</span></label>
+            </div>
+          </div>
+          <div class="question-card p-6 rounded-xl shadow-md">
+            <p class="font-medium text-gray-800">3. Sou uma pessoa que consegue manifestar suas emoções de acordo com as pessoas, situações e o momento oportuno...</p>
+            <div class="flex flex-wrap gap-4 mt-3">
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q3" value="1" required><span>Jamais</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q3" value="2"><span>Raramente</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q3" value="3"><span>Às vezes</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q3" value="4"><span>Quase Sempre</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q3" value="5"><span>Sempre</span></label>
+            </div>
+          </div>
+          <div class="question-card p-6 rounded-xl shadow-md">
+            <p class="font-medium text-gray-800">4. Sou uma pessoa que consegue controlar suas emoções, mantendo a calma nos momentos difíceis...</p>
+            <div class="flex flex-wrap gap-4 mt-3">
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q4" value="1" required><span>Jamais</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q4" value="2"><span>Raramente</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q4" value="3"><span>Às vezes</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q4" value="4"><span>Quase Sempre</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q4" value="5"><span>Sempre</span></label>
+            </div>
+          </div>
+          <div class="question-card p-6 rounded-xl shadow-md">
+            <p class="font-medium text-gray-800">5. Sou uma pessoa que tem uma visão realista de si mesmo(a), com adequada percepção de suas potencialidades e limitações...</p>
+            <div class="flex flex-wrap gap-4 mt-3">
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q5" value="1" required><span>Jamais</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q5" value="2"><span>Raramente</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q5" value="3"><span>Às vezes</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q5" value="4"><span>Quase Sempre</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q5" value="5"><span>Sempre</span></label>
+            </div>
+          </div>
+          <div class="question-card p-6 rounded-xl shadow-md">
+            <p class="font-medium text-gray-800">6. Sou uma pessoa que consegue superar seus sentimentos de frustração quando alguma coisa não dá certo, procurando aprender com as experiências negativas...</p>
+            <div class="flex flex-wrap gap-4 mt-3">
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q6" value="1" required><span>Jamais</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q6" value="2"><span>Raramente</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q6" value="3"><span>Às vezes</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q6" value="4"><span>Quase Sempre</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q6" value="5"><span>Sempre</span></label>
+            </div>
+          </div>
+          <div class="question-card p-6 rounded-xl shadow-md">
+            <p class="font-medium text-gray-800">7. Sou uma pessoa que, quando tem alguma dificuldade com outra pessoa, procura conversar diretamente com ela, evitando fofocas e mal-entendidos...</p>
+            <div class="flex flex-wrap gap-4 mt-3">
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q7" value="1" required><span>Jamais</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q7" value="2"><span>Raramente</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q7" value="3"><span>Às vezes</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q7" value="4"><span>Quase Sempre</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q7" value="5"><span>Sempre</span></label>
+            </div>
+          </div>
+          <div class="question-card p-6 rounded-xl shadow-md">
+            <p class="font-medium text-gray-800">8. Sou uma pessoa que é muito difícil perder a paciência com as pessoas de que gosto. Se perco, logo recupero e me arrependo de ter perdido...</p>
+            <div class="flex flex-wrap gap-4 mt-3">
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q8" value="1" required><span>Jamais</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q8" value="2"><span>Raramente</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q8" value="3"><span>Às vezes</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q8" value="4"><span>Quase Sempre</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q8" value="5"><span>Sempre</span></label>
+            </div>
+          </div>
+          <div class="question-card p-6 rounded-xl shadow-md">
+            <p class="font-medium text-gray-800">9. Sou uma pessoa que consegue expressar suas opiniões de forma clara e percebe que é ouvida com atenção...</p>
+            <div class="flex flex-wrap gap-4 mt-3">
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q9" value="1" required><span>Jamais</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q9" value="2"><span>Raramente</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q9" value="3"><span>Às vezes</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q9" value="4"><span>Quase Sempre</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q9" value="5"><span>Sempre</span></label>
+            </div>
+          </div>
+          <div class="question-card p-6 rounded-xl shadow-md">
+            <p class="font-medium text-gray-800">10. Sou uma pessoa que se sente segura diante das outras pessoas...</p>
+            <div class="flex flex-wrap gap-4 mt-3">
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q10" value="1" required><span>Jamais</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q10" value="2"><span>Raramente</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q10" value="3"><span>Às vezes</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q10" value="4"><span>Quase Sempre</span></label>
+              <label class="radio-label flex items-center gap-1"><input type="radio" name="q10" value="5"><span>Sempre</span></label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Botão de Envio -->
+      <div class="text-center">
+        <button type="submit" class="bg-gradient-to-r from-indigo-600 to-pink-600 text-white px-8 py-4 rounded-full hover:from-indigo-700 hover:to-pink-700 transition duration-300 text-lg font-semibold flex items-center justify-center gap-2 mx-auto pulse">
+          <i class="fas fa-paper-plane"></i> Enviar e Ver Resultados
+        </button>
+      </div>
+    </form>
+
+    <!-- Resultado -->
+    <div id="resultSection" class="hidden mt-10 p-8 bg-gradient-to-r from-green-100 via-blue-100 to-purple-100 rounded-3xl shadow-lg">
+      <h2 class="text-3xl font-bold text-center text-indigo-700 mb-6 flex items-center justify-center gap-2">
+        <i class="fas fa-star text-yellow-400"></i> Seu Resultado
+      </h2>
+      <p id="scoreText" class="text-2xl text-center font-bold text-gray-800 mb-4"></p>
+      <div id="calculationTable" class="mb-6"></div>
+      <p id="interpretation" class="text-lg text-center text-gray-700 max-w-2xl mx-auto mb-6"></p>
+      <canvas id="scoreChart" class="mt-8 max-w-sm mx-auto"></canvas>
+      <p class="text-sm text-gray-700 text-center mt-6">Rogério Augusto Braga</p>
+      <div class="text-center mt-6">
+        <button id="downloadPDF" class="bg-green-500 text-white px-8 py-4 rounded-full hover:bg-green-600 transition duration-300 text-lg font-semibold flex items-center justify-center gap-2 mx-auto">
+          <i class="fas fa-download"></i> Baixar Resultado em PDF
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('empathyForm');
+    const resultSection = document.getElementById('resultSection');
+    const scoreText = document.getElementById('scoreText');
+    const calculationTable = document.getElementById('calculationTable');
+    const interpretation = document.getElementById('interpretation');
+    const downloadPDF = document.getElementById('downloadPDF');
+    const progressBar = document.getElementById('progressBar');
+    let chartInstance;
+
+    // Atualizar barra de progresso
+    const updateProgress = () => {
+      const questions = document.querySelectorAll('input[type="radio"]:checked');
+      const progress = (questions.length / 10) * 100;
+      progressBar.style.width = `${progress}%`;
+      console.log(`Progresso: ${progress}%`);
+    };
+
+    document.querySelectorAll('input[type="radio"]').forEach(input => {
+      input.addEventListener('change', updateProgress);
+    });
+
+    // Função para obter o nome da opção
+    function getOptionName(value) {
+      switch (parseInt(value)) {
+        case 1: return 'Jamais';
+        case 2: return 'Raramente';
+        case 3: return 'Às vezes';
+        case 4: return 'Quase Sempre';
+        case 5: return 'Sempre';
+        default: return '';
+      }
+    }
+
+    // Função para gerar PDF
+    function generatePDF(data, totalScore, level, interpText, scoreColor, calculationDetails) {
+      try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ format: 'a4' });
+        doc.setFillColor(229, 231, 235);
+        doc.rect(0, 0, 210, 297, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(20);
+        doc.setTextColor(79, 70, 229);
+        doc.text('ImpulsoCoaching', 20, 10);
+        doc.text('Autodiagnóstico: Grau de Empatia', 20, 16);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(12);
+        doc.setTextColor(0);
+        doc.text(`Nome: ${data.name}`, 20, 26);
+        doc.text(`Profissão: ${data.profession}`, 20, 32);
+        doc.text(`E-mail: ${data.email}`, 20, 38);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(16);
+        doc.setTextColor(...(scoreColor === '#EF4444' ? [239, 68, 68] :
+                             scoreColor === '#FBBF24' ? [251, 191, 36] :
+                             scoreColor === '#10B981' ? [16, 185, 129] :
+                             [59, 130, 246]));
+        doc.text(`Pontuação Total: ${totalScore} pontos`, 20, 46);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(12);
+        doc.setTextColor(79, 70, 229);
+        doc.text(`Nível de Empatia: ${level}`, 20, 54);
+        doc.setTextColor(55, 65, 81);
+        doc.text('Interpretação:', 20, 62);
+        const interpLines = doc.splitTextToSize(interpText, 170);
+        doc.text(interpLines, 20, 68);
+        const interpHeight = interpLines.length * 5;
+        doc.setFontSize(10);
+        doc.setTextColor(0);
+        doc.text('Cálculo:', 20, 76 + interpHeight);
+        doc.setFillColor(79, 70, 229);
+        doc.rect(55, 81 + interpHeight, 100, 5, 'F');
+        doc.setTextColor(255);
+        doc.text('Opção', 57, 85 + interpHeight);
+        doc.text('Quant.', 85, 85 + interpHeight);
+        doc.text('Fator', 105, 85 + interpHeight);
+        doc.text('Pontos', 135, 85 + interpHeight);
+        doc.setTextColor(0);
+        let yTable = 86 + interpHeight;
+        calculationDetails.forEach(detail => {
+          doc.rect(55, yTable, 30, 5);
+          doc.rect(85, yTable, 20, 5);
+          doc.rect(105, yTable, 20, 5);
+          doc.rect(125, yTable, 30, 5);
+          doc.text(detail.option.slice(0, 10), 57, yTable + 4);
+          doc.text(detail.count.toString(), 87, yTable + 4);
+          doc.text(detail.factor.toString(), 107, yTable + 4);
+          doc.text(detail.points.toString(), 127, yTable + 4);
+          yTable += 5;
+        });
+        doc.rect(55, yTable, 70, 5);
+        doc.rect(125, yTable, 30, 5);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Total', 57, yTable + 4);
+        doc.text(totalScore.toString(), 127, yTable + 4);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(0);
+        doc.text('Gráfico:', 20, yTable + 10);
+        const chartCanvas = document.getElementById('scoreChart');
+        const chartImage = chartCanvas.toDataURL('image/png');
+        doc.addImage(chartImage, 'PNG', 55, yTable + 15, 100, 100);
+        doc.setFontSize(10);
+        doc.setTextColor(55, 65, 81);
+        doc.text('Fonte: Instituto Impulso Coaching – www.impulsocoaching.com.br', 105, yTable + 126, { align: 'center' });
+        doc.text('Rogério Augusto Braga', 105, yTable + 132, { align: 'center' });
+        doc.save(`Autodiagnostico_Empatia_Resultado_${data.name.replace(/\s+/g, '_')}.pdf`);
+        console.log('PDF gerado e salvo automaticamente');
+      } catch (error) {
+        console.error('Erro ao gerar PDF:', error);
+        alert('Erro ao gerar o PDF. Tente baixar manualmente clicando no botão.');
+      }
+    }
+
+    // Função para exibir resultados
+    function displayResults(data, totalScore, level, interpText, scoreColor, calculationDetails) {
+      console.log('Exibindo resultados...');
+      resultSection.classList.remove('hidden');
+      scoreText.textContent = `Sua pontuação: ${totalScore} pontos (${level})`;
+      scoreText.style.color = scoreColor;
+
+      // Exibir tabela de cálculo na interface
+      calculationTable.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Opção</th>
+              <th>Quantidade</th>
+              <th>Fator</th>
+              <th>Pontos</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${calculationDetails.map(detail => `
+              <tr>
+                <td>${detail.option}</td>
+                <td>${detail.count}</td>
+                <td>${detail.factor}</td>
+                <td>${detail.points}</td>
+              </tr>
+            `).join('')}
+            <tr>
+              <td colspan="3"><strong>Total</strong></td>
+              <td><strong>${totalScore}</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+
+      interpretation.textContent = interpText;
+
+      // Gerar gráfico circular
+      try {
+        if (chartInstance) chartInstance.destroy();
+        const ctx = document.getElementById('scoreChart').getContext('2d');
+        const pieData = [
+          totalScore <= 20 ? 100 : 25,
+          totalScore > 20 && totalScore <= 30 ? 100 : 25,
+          totalScore > 30 && totalScore <= 40 ? 100 : 25,
+          totalScore > 40 ? 100 : 25
+        ];
+        chartInstance = new Chart(ctx, {
+          type: 'pie',
+          data: {
+            labels: ['Baixo (10-20)', 'Moderado (21-30)', 'Alto (31-40)', 'Muito Alto (41-50)'],
+            datasets: [{
+              data: pieData,
+              backgroundColor: ['#EF4444', '#FBBF24', '#10B981', '#3B82F6'],
+              borderColor: ['#B91C1C', '#D97706', '#047857', '#1E40AF'],
+              borderWidth: 2
+            }]
+          },
+          options: {
+            plugins: {
+              legend: { position: 'bottom', labels: { font: { size: 14, family: 'Poppins' } } },
+              title: {
+                display: true,
+                text: `Seu Nível de Empatia: ${level}`,
+                font: { size: 20, family: 'Poppins' },
+                color: '#1F2937'
+              }
+            },
+            animation: {
+              duration: 2000,
+              easing: 'easeOutElastic',
+              onComplete: () => {
+                // Gerar PDF automaticamente após renderização do gráfico
+                setTimeout(() => {
+                  generatePDF(data, totalScore, level, interpText, scoreColor, calculationDetails);
+                }, 500);
+              }
+            }
+          }
+        });
+        console.log('Gráfico renderizado');
+      } catch (error) {
+        console.error('Erro ao renderizar gráfico:', error);
+        alert('Erro ao renderizar o gráfico. O PDF pode não incluir o gráfico.');
+      }
+
+      // Evento para download manual
+      downloadPDF.onclick = () => {
+        generatePDF(data, totalScore, level, interpText, scoreColor, calculationDetails);
+      };
+
+      window.scrollTo({ top: resultSection.offsetTop, behavior: 'smooth' });
+    }
+
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      console.log('Formulário enviado');
+
+      // Coleta de dados
+      const formData = new FormData(form);
+      const data = {
+        name: formData.get('name'),
+        profession: formData.get('profession'),
+        email: formData.get('email'),
+        answers: {}
+      };
+
+      // Validação simplificada
+      try {
+        const checkedInputs = document.querySelectorAll('input[type="radio"]:checked');
+        if (checkedInputs.length !== 10) {
+          alert('Por favor, responda todas as 10 questões.');
+          console.log(`Validação falhou: ${checkedInputs.length} respostas selecionadas`);
+          return;
+        }
+
+        for (let i = 1; i <= 10; i++) {
+          const answer = formData.get(`q${i}`);
+          if (!answer) {
+            alert(`Questão ${i} não respondida.`);
+            console.log(`Questão ${i} sem resposta`);
+            return;
+          }
+          data.answers[`q${i}`] = parseInt(answer);
+        }
+        console.log('Respostas validadas:', data.answers);
+      } catch (error) {
+        console.error('Erro na validação:', error);
+        alert('Erro ao validar respostas. Tente novamente.');
+        return;
+      }
+
+      // Contagem das escolhas
+      const counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+      Object.values(data.answers).forEach(value => {
+        counts[value]++;
+      });
+      console.log('Contagem:', counts);
+
+      // Cálculo da pontuação
+      const factors = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5 };
+      let totalScore = 0;
+      const calculationDetails = [];
+      for (const [value, count] of Object.entries(counts)) {
+        const factor = factors[value];
+        const points = count * factor;
+        totalScore += points;
+        calculationDetails.push({ option: getOptionName(value), count, factor, points });
+      }
+      console.log('Pontuação total:', totalScore);
+
+      // Determinar nível de empatia
+      let level = '';
+      let interpText = '';
+      let scoreColor = '';
+      if (totalScore <= 20) {
+        level = 'Baixo';
+        interpText = 'Seu grau de empatia é baixo. Considere trabalhar em habilidades como escuta ativa e compreensão emocional para melhorar suas relações.';
+        scoreColor = '#EF4444';
+      } else if (totalScore <= 30) {
+        level = 'Moderado';
+        interpText = 'Seu grau de empatia é moderado. Você demonstra empatia em algumas situações, mas há espaço para crescimento em consistência.';
+        scoreColor = '#FBBF24';
+      } else if (totalScore <= 40) {
+        level = 'Alto';
+        interpText = 'Seu grau de empatia é alto! Você é compreensivo e lida bem com emoções, mas pode refinar ainda mais suas habilidades.';
+        scoreColor = '#10B981';
+      } else {
+        level = 'Muito Alto';
+        interpText = 'Parabéns! Seu grau de empatia é muito alto, refletindo grande habilidade em se conectar emocionalmente com os outros.';
+        scoreColor = '#3B82F6';
+      }
+      console.log('Nível:', level);
+
+      // Exibir resultados imediatamente
+      displayResults(data, totalScore, level, interpText, scoreColor, calculationDetails);
+
+      // Resetar formulário e progresso
+      form.reset();
+      progressBar.style.width = '0%';
+    });
+  </script>
+</body>
+</html>
